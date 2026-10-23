@@ -173,9 +173,9 @@ export function Mascot({
       {eye(49)}
       {eye(71)}
       <Path d="M56 62 Q60 66 64 62" stroke={glow} strokeWidth={2.5} fill="none" strokeLinecap="round" />
-      <Path d="M20 46 Q20 8 60 8 Q100 8 100 46" stroke={C.primary} strokeWidth={5} fill="none" strokeLinecap="round" />
-      <Rect x={13} y={42} width={13} height={26} rx={6.5} fill={C.primary} />
-      <Rect x={94} y={42} width={13} height={26} rx={6.5} fill={C.primary} />
+      <Path d="M20 46 Q20 8 60 8 Q100 8 100 46" stroke={C.gold} strokeWidth={5} fill="none" strokeLinecap="round" />
+      <Rect x={13} y={42} width={13} height={26} rx={6.5} fill={C.gold} />
+      <Rect x={94} y={42} width={13} height={26} rx={6.5} fill={C.gold} />
       {wearing && <Outfit id={wearing} />}
     </Svg>
   );

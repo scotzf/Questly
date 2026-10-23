@@ -50,7 +50,7 @@ export default function Plan() {
       </View>
       {plan.slots.map((slot) => {
         const task = state.tasks.find((t) => t.id === slot.taskId);
-        const cat = CATEGORIES[task?.category ?? "other"];
+        const cat = CATEGORIES[task?.category ?? "growth"];
         return (
           <View key={slot.id} style={[s.row, { marginBottom: 10, alignItems: "stretch" }]}>
             <Text style={[s.small, { width: 62, paddingTop: 14, fontWeight: "600" }]}>

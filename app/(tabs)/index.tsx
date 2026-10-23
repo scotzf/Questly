@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
@@ -7,6 +8,8 @@ import {
   dayKey,
   isFrozen,
   dayXp,
+  ensureQuests,
+  habitDueOn,
   nextStep,
   progress,
   quests,
@@ -38,6 +41,7 @@ import {
   time,
 } from "../../src/ui";
 import { useNow } from "../../src/useNow";
+import HabitRow from "../../src/HabitRow";
 const LETTERS = ["M", "T", "W", "T", "F", "S", "S"];
 export default function Home() {
   const { state, update } = useStore();
@@ -53,6 +57,12 @@ export default function Home() {
   const cat = next && CATEGORIES[next.category];
   const step = next && nextStep(next);
   const reached = today >= goal;
+  const key = dayKey(now);
+  // Today's quests are chosen once, the first time Home shows that day.
+  useEffect(() => {
+    void update((v) => ensureQuests(v));
+  }, [key, update]);
+  const habitsToday = state.habits.filter((h) => habitDueOn(h, now));
   return (
     <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: C.bg }}>
       <Screen padBottom={110}>
@@ -60,11 +70,13 @@ export default function Home() {
           <Pressable onPress={() => router.push("/stats")} style={{ flex: 1 }}>
             <Text style={s.h1}>{state.settings.name || "Hi"} 👋</Text>
           </Pressable>
-          <Pill label={String(days)} icon="flame" color="#F97316" />
-          <Pressable onPress={() => router.push("/shop")}>
-            <Pill label={coins.toLocaleString()} icon="ellipse" color={C.gold} />
-          </Pressable>
-          <Pill label={`Lv ${level}`} icon="star" color={C.primary} />
+          <View style={[s.row, { gap: 6, alignItems: "flex-start" }]}>
+            <Pill label={String(days)} icon="flame" color="#F97316" />
+            <Pressable onPress={() => router.push("/shop")}>
+              <Pill label={coins.toLocaleString()} icon="ellipse" color={C.gold} />
+            </Pressable>
+            <Pill label={`Lv ${level}`} icon="star" color={C.primary} />
+          </View>
         </View>
         <Pressable
           accessibilityRole="button"
@@ -87,13 +99,14 @@ export default function Home() {
                 <>
                   <Text style={[s.h1, { fontSize: 30 }]}>{today}</Text>
                   <Text style={[s.small, { color: C.ink, fontWeight: "700" }]}>/ {goal} XP</Text>
+                  <Text style={[s.small, { color: C.ink }]}>today</Text>
                 </>
               )}
             </Ring>
             <Mascot size={140} mood={reached ? "happy" : today ? "calm" : "neutral"} />
           </View>
         </Pressable>
-        <Card style={[s.row, { justifyContent: "space-between", paddingVertical: 14 }]}>
+        <Card style={[s.row, { justifyContent: "space-between", gap: 0, paddingVertical: 14 }]}>
           {week.map((d, i) => {
             const isToday = d.day === startOfDay(now);
             const frozen = isFrozen(state, d.day);
@@ -135,8 +148,9 @@ export default function Home() {
             return (
               <View key={q.id} style={[s.row, { minHeight: 52 }]}>
                 <IconTile name={q.icon as IconName} color={done ? C.success : C.gold} size={38} />
-                <View style={{ flex: 1, gap: 6 }}>
-                  <Text style={[s.body, { color: C.ink, fontWeight: "600" }]}>{q.title}</Text>
+                <View style={{ flex: 1, gap: 4 }}>
+                  <Text style={[s.body, { color: C.ink, fontWeight: "700" }]}>{q.title}</Text>
+                  <Text style={s.small}>{q.detail}</Text>
                   <ProgressBar value={q.value / q.goal} color={done ? C.success : C.gold} />
                 </View>
                 {done ? (
@@ -150,6 +164,17 @@ export default function Home() {
             );
           })}
         </Card>
+        {habitsToday.length > 0 && (
+          <Card style={{ gap: 0, paddingVertical: 6 }}>
+            <View style={[s.row, { paddingTop: 8 }]}>
+              <Text style={[s.h3, { flex: 1 }]}>Habits</Text>
+              <Icon name="repeat" color={C.primary} />
+            </View>
+            {habitsToday.map((h) => (
+              <HabitRow key={h.id} habit={h} now={now} />
+            ))}
+          </Card>
+        )}
         {next && cat ? (
           <Card style={{ borderLeftWidth: 5, borderLeftColor: cat.color }}>
             <Text style={[s.small, { fontWeight: "700" }]}>Up Next</Text>

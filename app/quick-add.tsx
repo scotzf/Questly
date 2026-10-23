@@ -11,6 +11,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import TextScan from "../modules/text-scan";
 import { scanImage } from "../src/scanImage";
+import { detectSkill } from "../src/skills";
 import * as Crypto from "expo-crypto";
 import { useStore } from "../src/store";
 import { CategoryId, dayKey, newTask, startOfDay } from "../src/domain";
@@ -37,6 +38,7 @@ export default function QuickAdd() {
   ];
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState<CategoryId>("study");
+  const [areaPicked, setAreaPicked] = useState(false);
   const [day, setDay] = useState<number | null>(picked ?? today);
   const [high, setHigh] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -109,7 +111,11 @@ export default function QuickAdd() {
           <TextInput
             autoFocus
             value={title}
-            onChangeText={setTitle}
+            onChangeText={(v) => {
+              setTitle(v);
+              const area = detectSkill(v)?.area;
+              if (!areaPicked && area) setCategory(area);
+            }}
             onSubmitEditing={() => void add()}
             returnKeyType="done"
             placeholder="New task"
@@ -152,7 +158,10 @@ export default function QuickAdd() {
               icon={CATEGORIES[id].icon}
               color={CATEGORIES[id].color}
               selected={category === id}
-              onPress={() => setCategory(id)}
+              onPress={() => {
+                setAreaPicked(true);
+                setCategory(id);
+              }}
             />
           ))}
         </ScrollView>

@@ -13,11 +13,17 @@ const DUE_HINT = /\b(due|deadline|submit|submission|until|before|by|on)\b/i;
 const CONCRETE =
   /\d|\b(mon|tue|wed|thu|fri|sat|sun|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)|\b(today|tomorrow|tonight|noon|midnight)\b/i;
 const JUNK = /^(?:\d{1,2}:\d{2}(?:\s?[ap]m)?|\d{1,3}%|[\W_]+)$/i;
-const CATEGORY_WORDS: [CategoryId, RegExp][] = [
-  ["journalism", /\b(article|news|interview|editorial|feature story|publication|press|headline|layout|byline)\b/i],
-  ["project", /\b(project|meeting|presentation|deploy|sprint|repo|client|proposal|demo|prototype|capstone)\b/i],
-  ["study", /\b(quiz|exam|essay|homework|assignment|module|lesson|chapter|lab|reading|activity|seatwork|research|thesis|reviewer|lecture|course|class|worksheet|problem set)\b/i],
-  ["personal", /\b(buy|gym|pay|bill|doctor|birthday|grocer\w*|clean|laundry|family|appointment)\b/i],
+/** Fallback words per area; the skill library's keywords are tried first. */
+const AREA_WORDS: [CategoryId, RegExp][] = [
+  ["study", /\b(quiz|exam|essay|homework|assignment|module|lesson|chapter|lab|reading|activity|seatwork|research|thesis|reviewer|lecture|course|class|worksheet|problem set|recitation)\b/i],
+  ["work", /\b(project|meeting|presentation|deploy|sprint|repo|client|proposal|demo|prototype|capstone|report|deadline|code|program)\b/i],
+  ["creative", /\b(article|news|interview|editorial|feature story|publication|layout|byline|draw|paint|design|photo|video|edit|song|music)\b/i],
+  ["fitness", /\b(gym|run|jog|workout|exercise|training|practice game|basketball|volleyball|swim)\b/i],
+  ["wellness", /\b(meditat\w*|sleep|doctor|checkup|medicine|therapy|journal|water|pray\w*|mass)\b/i],
+  ["social", /\b(birthday|party|call|visit|family|friend|date|reunion|outreach|volunteer)\b/i],
+  ["money", /\b(pay|bill|budget|save|savings|invest\w*|tax|loan|bank|tuition)\b/i],
+  ["home", /\b(buy|grocer\w*|clean|laundry|cook|dishes|errand|appointment|pet|repair)\b/i],
+  ["hobbies", /\b(game|movie|travel|trip|hike|camp|garden|bake|concert)\b/i],
 ];
 /** Fraction of `line` covered by date text, e.g. "Due: Oct 30, 11:59 PM" ≈ 1. */
 const dateShare = (line: string, now: Date) =>
@@ -37,7 +43,12 @@ export function findDue(lines: string[], now = new Date()): number | null {
   if (!pick.r.start.isCertain("hour")) d.setHours(23, 59, 0, 0);
   return d.getTime();
 }
-export function parseScan(raw: ScanLine[], now = new Date()): ScanDraft {
+export function parseScan(
+  raw: ScanLine[],
+  now = new Date(),
+  /** Optional smarter matcher (the skill library). */
+  detect?: (text: string) => CategoryId | undefined,
+): ScanDraft {
   const lines = raw
     .map((l) => ({ ...l, text: l.text.trim() }))
     .filter((l) => l.text && !JUNK.test(l.text))
@@ -71,7 +82,8 @@ export function parseScan(raw: ScanLine[], now = new Date()): ScanDraft {
   const title = (best?.l.text ?? texts[0] ?? "Scanned task").replace(/[:\-–\s]+$/, "").slice(0, 80);
   if (best) used.add(best.i);
   const all = texts.join(" ");
-  const category = CATEGORY_WORDS.find(([, re]) => re.test(all))?.[0] ?? "other";
+  const category =
+    detect?.(all) ?? AREA_WORDS.find(([, re]) => re.test(all))?.[0] ?? "growth";
   const description = lines
     .filter((_, i) => !used.has(i))
     .map((l) => l.text)

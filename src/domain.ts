@@ -1,5 +1,7 @@
+import type { AreaId } from "./skills/types";
 export type Priority = "Low" | "Medium" | "High";
-export type CategoryId = "study" | "project" | "journalism" | "personal" | "other";
+/** A task's area (Study, Fitness, …); see src/skills/taxonomy.ts. */
+export type CategoryId = AreaId;
 /** `doneAt` dates subtask XP; older data may lack it. */
 export type Step = { id: string; title: string; done: boolean; doneAt?: number };
 export type Task = {
@@ -18,6 +20,41 @@ export type Task = {
   completedAt: number | null;
   createdAt: number;
   updatedAt: number;
+  /** Set when the task was added from a skill's practice. */
+  skillId?: string;
+};
+/** A recurring check-in. `days` are weekdays (0 = Sun); `log` holds check-in times. */
+export type Habit = {
+  id: string;
+  title: string;
+  category: CategoryId;
+  days: number[];
+  log: number[];
+  createdAt: number;
+  skillId?: string;
+  archived?: boolean;
+};
+/**
+ * Proof attached to a milestone. Optional today (milestones are self-reported);
+ * the slot exists so verification can be added without migrating data.
+ */
+export type Evidence = {
+  at: number;
+  note?: string;
+  value?: number;
+  unit?: string;
+  /** Local file URI of a photo. */
+  photo?: string;
+};
+/** Progress in one skill: chosen branch and milestone completion times. */
+export type SkillProgress = {
+  started: number;
+  branch: string | null;
+  milestones: Record<string, number>;
+  /** Level id -> when its last milestone was completed. */
+  levels: Record<string, number>;
+  /** Milestone id -> proof, when given. */
+  evidence?: Record<string, Evidence>;
 };
 export type Slot = { id: string; taskId: string; start: number; end: number };
 export type Settings = {
@@ -46,6 +83,10 @@ export type State = {
   slots: Slot[];
   settings: Settings;
   shop: Shop;
+  habits: Habit[];
+  skills: Record<string, SkillProgress>;
+  /** Quest ids picked for each day (dayKey -> ids), so history stays stable. */
+  questLog: Record<string, string[]>;
 };
 export const initialState = (): State => ({
   tasks: [],
@@ -62,15 +103,36 @@ export const initialState = (): State => ({
     dailyGoal: 30,
   },
   shop: { spent: 0, freezes: 0, owned: [], outfit: null, frozen: [] },
+  habits: [],
+  skills: {},
+  questLog: {},
 });
-const taskDefaults = { course: "", category: "other", reminder: null } as const;
+const taskDefaults = { course: "", category: "growth", reminder: null } as const;
+/** Categories from before the 10 areas. */
+const OLD_CATEGORY: Record<string, CategoryId> = {
+  project: "work",
+  journalism: "creative",
+  personal: "home",
+  other: "growth",
+};
 /** Fills fields missing from data saved by an older version. */
 export const withDefaults = (saved: Partial<State>): State => {
   const base = initialState();
   return {
-    tasks: (saved.tasks ?? []).map((t) => ({ ...taskDefaults, ...t })),
+    tasks: (saved.tasks ?? []).map((t) => {
+      const task = { ...taskDefaults, ...t };
+      return { ...task, category: OLD_CATEGORY[task.category] ?? task.category };
+    }),
     slots: saved.slots ?? [],
     shop: { ...base.shop, ...saved.shop },
+    habits: saved.habits ?? [],
+    skills: Object.fromEntries(
+      Object.entries(saved.skills ?? {}).map(([id, p]) => [
+        id,
+        { started: 0, branch: null, milestones: {}, levels: {}, ...(p as Partial<SkillProgress>) },
+      ]),
+    ),
+    questLog: saved.questLog ?? {},
     settings: {
       ...base.settings,
       ...saved.settings,
@@ -215,40 +277,242 @@ export const stepProgress = (task: Task) =>
 
 // ---- XP, streaks, quests (Duolingo-style loop) ----
 export const STEP_XP = 3;
+export const HABIT_XP = 5;
+export const MILESTONE_XP = 25;
+export const LEVEL_XP = 50;
+/**
+ * Self-reported milestones and levels only earn XP up to this many per day;
+ * extra ones still count as progress. Keeps leagues fair until evidence exists.
+ */
+export const MAX_SELF_REPORTED_PER_DAY = 3;
+/** Ticked off within 2 minutes of being added: counts, but barely (keeps leagues fair). */
+const INSTANT = 2 * 60000;
 /** XP for completing a task: base + priority + beating the deadline. */
 export const taskXp = (t: Task) =>
-  10 +
-  { High: 10, Medium: 5, Low: 0 }[t.priority] +
-  (t.completedAt && t.dueAt && t.completedAt <= t.dueAt ? 5 : 0);
-type XpEvent = { at: number; xp: number; kind: "task" | "step"; task: Task };
-const xpEvents = (s: State): XpEvent[] =>
-  s.tasks.flatMap((t) => [
-    ...(t.completedAt ? [{ at: t.completedAt, xp: taskXp(t), kind: "task" as const, task: t }] : []),
+  t.completedAt && t.completedAt - t.createdAt < INSTANT
+    ? 2
+    : 10 +
+      { High: 10, Medium: 5, Low: 0 }[t.priority] +
+      (t.completedAt && t.dueAt && t.completedAt <= t.dueAt ? 5 : 0);
+type XpEvent = {
+  at: number;
+  xp: number;
+  kind: "task" | "step" | "habit" | "milestone" | "level";
+  category?: CategoryId;
+  task?: Task;
+  skill?: boolean;
+};
+const xpEvents = (s: State): XpEvent[] => [
+  ...s.tasks.flatMap((t) => [
+    ...(t.completedAt
+      ? [{ at: t.completedAt, xp: taskXp(t), kind: "task" as const, category: t.category, task: t, skill: !!t.skillId }]
+      : []),
     ...t.steps
       .filter((x) => x.done && x.doneAt)
-      .map((x) => ({ at: x.doneAt!, xp: STEP_XP, kind: "step" as const, task: t })),
-  ]);
+      .map((x) => ({ at: x.doneAt!, xp: STEP_XP, kind: "step" as const, category: t.category, task: t })),
+  ]),
+  ...s.habits.flatMap((h) =>
+    h.log.map((at) => ({ at, xp: HABIT_XP, kind: "habit" as const, category: h.category, skill: !!h.skillId })),
+  ),
+  ...capSelfReported(
+    Object.values(s.skills).flatMap((p) => [
+      ...Object.entries(p.milestones).map(([id, at]) => ({
+        at,
+        xp: MILESTONE_XP,
+        kind: "milestone" as const,
+        skill: true,
+        proven: !!p.evidence?.[id],
+      })),
+      ...Object.values(p.levels).map((at) => ({ at, xp: LEVEL_XP, kind: "level" as const, skill: true, proven: false })),
+    ]),
+  ),
+];
+function capSelfReported(events: (XpEvent & { proven: boolean })[]): XpEvent[] {
+  const perDay = new Map<string, number>();
+  return [...events]
+    .sort((a, b) => a.at - b.at)
+    .map(({ proven, ...e }) => {
+      if (proven) return e;
+      const key = dayKey(e.at);
+      const n = (perDay.get(key) ?? 0) + 1;
+      perDay.set(key, n);
+      return n > MAX_SELF_REPORTED_PER_DAY ? { ...e, xp: 0 } : e;
+    });
+}
 const onDay = (e: XpEvent[], day: number) => {
   const start = startOfDay(day);
   return e.filter((x) => x.at >= start && x.at < start + DAY);
 };
-export type Quest = { id: string; title: string; icon: string; value: number; goal: number; xp: number };
-/** Three quests per day, picked deterministically from the date. */
+export const habitDueOn = (h: Habit, day: number) =>
+  !h.archived && h.days.includes(new Date(day).getDay());
+export const habitDoneOn = (h: Habit, day: number) =>
+  h.log.some((at) => dayKey(at) === dayKey(day));
+export type Quest = {
+  id: string;
+  title: string;
+  detail: string;
+  icon: string;
+  value: number;
+  goal: number;
+  xp: number;
+};
+type QuestDef = {
+  title: string;
+  detail: string;
+  icon: string;
+  xp: number;
+  goal: (s: State, day: number) => number;
+  value: (events: XpEvent[], s: State, day: number) => number;
+  /** Offered only when it can be done today. */
+  available: (s: State, now: number) => boolean;
+};
+const open = (s: State) => s.tasks.filter((t) => !t.completedAt);
+const areaQuest = (area: CategoryId, title: string, label: string, icon: string): QuestDef => ({
+  title,
+  detail: `Finish 1 ${label} task or habit`,
+  icon,
+  xp: 10,
+  goal: () => 1,
+  value: (e) => e.filter((x) => (x.kind === "task" || x.kind === "habit") && x.category === area).length,
+  available: (s, now) =>
+    open(s).some((t) => t.category === area) ||
+    s.habits.some((h) => h.category === area && habitDueOn(h, now)),
+});
+const dueToday = (s: State, day: number) =>
+  s.tasks.filter((t) => t.dueAt && dayKey(t.dueAt) === dayKey(day));
+export const QUESTS: Record<string, QuestDef> = {
+  goal: {
+    title: "Earn XP",
+    detail: "Your daily XP target",
+    icon: "star",
+    xp: 10,
+    goal: (s) => s.settings.dailyGoal,
+    value: (e) => e.reduce((n, x) => n + x.xp, 0),
+    available: () => true,
+  },
+  tasks2: {
+    title: "Finish 2 tasks",
+    detail: "Any 2 tasks",
+    icon: "checkmark-done",
+    xp: 10,
+    goal: () => 2,
+    value: (e) => e.filter((x) => x.kind === "task").length,
+    available: () => true,
+  },
+  steps5: {
+    title: "Check off 5 subtasks",
+    detail: "Small steps count",
+    icon: "list",
+    xp: 10,
+    goal: () => 5,
+    value: (e) => e.filter((x) => x.kind === "step").length,
+    available: (s) => open(s).reduce((n, t) => n + t.steps.filter((x) => !x.done).length, 0) >= 5,
+  },
+  fitness: areaQuest("fitness", "Move your body", "Fitness", "barbell"),
+  wellness: areaQuest("wellness", "Mind break", "Wellness", "leaf"),
+  creative: areaQuest("creative", "Make something", "Creative", "color-palette"),
+  home: areaQuest("home", "Home reset", "Home", "home"),
+  social: areaQuest("social", "Reach out", "Social", "people"),
+  study: areaQuest("study", "Study session", "Study", "school"),
+  balance: {
+    title: "Balanced day",
+    detail: "Finish tasks in 3 areas",
+    icon: "pie-chart",
+    xp: 15,
+    goal: () => 3,
+    value: (e) => new Set(e.filter((x) => x.kind === "task").map((x) => x.category)).size,
+    available: (s) => new Set(open(s).map((t) => t.category)).size >= 3,
+  },
+  habits2: {
+    title: "Keep 2 habits",
+    detail: "Check in 2 habits today",
+    icon: "repeat",
+    xp: 10,
+    goal: () => 2,
+    value: (e) => e.filter((x) => x.kind === "habit").length,
+    available: (s, now) => s.habits.filter((h) => habitDueOn(h, now)).length >= 2,
+  },
+  early: {
+    title: "Early start",
+    detail: "Finish a task before 12 PM",
+    icon: "sunny",
+    xp: 10,
+    goal: () => 1,
+    value: (e) => e.filter((x) => x.kind === "task" && new Date(x.at).getHours() < 12).length,
+    available: (s, now) => new Date(now).getHours() < 10 && open(s).length > 0,
+  },
+  clear: {
+    title: "Clear today's list",
+    detail: "Finish everything due today",
+    icon: "checkbox",
+    xp: 15,
+    goal: (s, day) => Math.max(1, dueToday(s, day).length),
+    value: (_e, s, day) => dueToday(s, day).filter((t) => t.completedAt).length,
+    available: (s, now) => dueToday(s, now).some((t) => !t.completedAt),
+  },
+  high: {
+    title: "Top priority",
+    detail: "Finish a High-priority task",
+    icon: "flag",
+    xp: 15,
+    goal: () => 1,
+    value: (e) => e.filter((x) => x.kind === "task" && x.task?.priority === "High").length,
+    available: (s) => open(s).some((t) => t.priority === "High"),
+  },
+  plan: {
+    title: "Plan tomorrow",
+    detail: "Add a task for tomorrow",
+    icon: "calendar",
+    xp: 5,
+    goal: () => 1,
+    value: (_e, s, day) =>
+      s.tasks.filter(
+        (t) =>
+          dayKey(t.createdAt) === dayKey(day) &&
+          t.dueAt &&
+          dayKey(t.dueAt) === dayKey(startOfDay(day) + DAY + DAY / 2),
+      ).length,
+    available: () => true,
+  },
+  practice: {
+    title: "Practice an activity",
+    detail: "Finish an activity practice or milestone",
+    icon: "school",
+    xp: 15,
+    goal: () => 1,
+    value: (e) => e.filter((x) => x.skill).length,
+    available: (s) => Object.keys(s.skills).length > 0,
+  },
+};
+const hash = (text: string) =>
+  [...text].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
+/** Picks and saves today's quests once: "Earn XP" plus 2 that can be done today. */
+export const ensureQuests = (s: State, now = Date.now()): State => {
+  const key = dayKey(now);
+  if (s.questLog[key]) return s;
+  const pool = Object.keys(QUESTS)
+    .filter((id) => id !== "goal" && QUESTS[id].available(s, now))
+    .sort((a, b) => hash(key + a) - hash(key + b));
+  return { ...s, questLog: { ...s.questLog, [key]: ["goal", ...pool.slice(0, 2)] } };
+};
+/** The day's saved quests with progress; empty if none were picked that day. */
 export const quests = (s: State, now = Date.now()): Quest[] => {
-  const today = onDay(xpEvents(s), now);
-  const tasks = today.filter((e) => e.kind === "task");
-  const xp = today.reduce((n, e) => n + e.xp, 0);
-  const pool: Quest[] = [
-    { id: "goal", title: "Hit your daily goal", icon: "flag", value: xp, goal: s.settings.dailyGoal, xp: 10 },
-    { id: "three", title: "Complete 3 tasks", icon: "checkmark-done", value: tasks.length, goal: 3, xp: 10 },
-    { id: "steps", title: "Finish 5 subtasks", icon: "list", value: today.length - tasks.length, goal: 5, xp: 10 },
-    { id: "early", title: "Beat a deadline", icon: "alarm", value: tasks.filter((e) => e.task.dueAt && e.at <= e.task.dueAt).length, goal: 1, xp: 15 },
-    { id: "high", title: "Finish a High priority task", icon: "flame", value: tasks.filter((e) => e.task.priority === "High").length, goal: 1, xp: 15 },
-    { id: "variety", title: "Work in 2 categories", icon: "color-palette", value: new Set(tasks.map((e) => e.task.category)).size, goal: 2, xp: 10 },
-  ];
-  const seed = new Date(now).getDate() + new Date(now).getMonth() * 31;
-  const daily = [pool[0], pool[1 + (seed % 5)], pool[1 + ((seed + 2) % 5)]];
-  return daily.map((q) => ({ ...q, value: Math.min(q.value, q.goal) }));
+  const events = onDay(xpEvents(s), now);
+  return (s.questLog[dayKey(now)] ?? [])
+    .filter((id) => QUESTS[id])
+    .map((id) => {
+      const q = QUESTS[id];
+      const goal = q.goal(s, now);
+      return {
+        id,
+        title: id === "goal" ? `Earn ${goal} XP` : q.title,
+        detail: q.detail,
+        icon: q.icon,
+        xp: q.xp,
+        goal,
+        value: Math.min(goal, q.value(events, s, now)),
+      };
+    });
 };
 const questXp = (s: State, day: number) =>
   quests(s, day).reduce((n, q) => n + (q.value >= q.goal ? q.xp : 0), 0);
@@ -371,3 +635,95 @@ export const wear = (s: State, outfit: string | null): State => ({
   ...s,
   shop: { ...s.shop, outfit: outfit && s.shop.owned.includes(outfit) ? outfit : null },
 });
+
+// ---- Habits ----
+/** Spreads "N times a week" over sensible weekdays (0 = Sun). */
+export const daysForPerWeek = (perWeek: number): number[] =>
+  ({ 1: [6], 2: [2, 4], 3: [1, 3, 5], 4: [1, 2, 4, 5], 5: [1, 2, 3, 4, 5], 6: [1, 2, 3, 4, 5, 6] })[
+    perWeek
+  ] ?? [0, 1, 2, 3, 4, 5, 6];
+export const addHabit = (s: State, habit: Habit): State => ({ ...s, habits: [...s.habits, habit] });
+export const deleteHabit = (s: State, id: string): State => ({
+  ...s,
+  habits: s.habits.filter((h) => h.id !== id),
+});
+/** Checks a habit in for today, or undoes today's check-in. */
+export const toggleHabit = (s: State, id: string, now = Date.now()): State => ({
+  ...s,
+  habits: s.habits.map((h) =>
+    h.id !== id
+      ? h
+      : habitDoneOn(h, now)
+        ? { ...h, log: h.log.filter((at) => dayKey(at) !== dayKey(now)) }
+        : { ...h, log: [...h.log, now] },
+  ),
+});
+/** Consecutive scheduled days the habit was done, ending today or the last due day. */
+export const habitStreak = (h: Habit, now = Date.now()) => {
+  let day = startOfDay(now);
+  if (!habitDoneOn(h, day)) day = startOfDay(day - DAY / 2);
+  let count = 0;
+  for (let i = 0; i < 400; i++) {
+    if (habitDueOn(h, day)) {
+      if (!habitDoneOn(h, day)) break;
+      count++;
+    }
+    day = startOfDay(day - DAY / 2);
+  }
+  return count;
+};
+
+// ---- Skills ----
+export const startSkill = (s: State, skillId: string, now = Date.now()): State =>
+  s.skills[skillId]
+    ? s
+    : { ...s, skills: { ...s.skills, [skillId]: { started: now, branch: null, milestones: {}, levels: {} } } };
+export const stopSkill = (s: State, skillId: string): State => {
+  const skills = { ...s.skills };
+  delete skills[skillId];
+  return { ...s, skills };
+};
+export const chooseBranch = (s: State, skillId: string, branch: string | null): State => {
+  const p = s.skills[skillId];
+  return p ? { ...s, skills: { ...s.skills, [skillId]: { ...p, branch } } } : s;
+};
+/**
+ * Ticks or unticks a milestone. When every milestone of its level is done the
+ * level is marked complete; unticking reopens it.
+ */
+export const toggleMilestone = (
+  s: State,
+  skillId: string,
+  levelId: string,
+  levelMilestones: string[],
+  milestoneId: string,
+  now = Date.now(),
+): State => {
+  const base = startSkill(s, skillId, now);
+  const p = base.skills[skillId];
+  const milestones = { ...p.milestones };
+  const levels = { ...p.levels };
+  if (milestones[milestoneId]) {
+    delete milestones[milestoneId];
+    delete levels[levelId];
+  } else {
+    milestones[milestoneId] = now;
+    if (levelMilestones.every((m) => milestones[m])) levels[levelId] = now;
+  }
+  return { ...base, skills: { ...base.skills, [skillId]: { ...p, milestones, levels } } };
+};
+
+/** Attaches (or with null, removes) proof for a milestone. */
+export const setEvidence = (
+  s: State,
+  skillId: string,
+  milestoneId: string,
+  evidence: Evidence | null,
+): State => {
+  const p = s.skills[skillId];
+  if (!p) return s;
+  const all = { ...p.evidence };
+  if (evidence) all[milestoneId] = evidence;
+  else delete all[milestoneId];
+  return { ...s, skills: { ...s.skills, [skillId]: { ...p, evidence: all } } };
+};

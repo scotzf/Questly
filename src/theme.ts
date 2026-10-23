@@ -27,20 +27,15 @@ export const CATEGORIES: Record<
   { label: string; color: string; pale: string; icon: IconName }
 > = {
   study: { label: "Study", color: "#8B5CF6", pale: "#F1EBFF", icon: "school" },
-  project: { label: "Project", color: "#3B82F6", pale: "#E6F0FF", icon: "folder" },
-  journalism: {
-    label: "Journalism",
-    color: "#EC4899",
-    pale: "#FDE8F3",
-    icon: "newspaper",
-  },
-  personal: {
-    label: "Personal",
-    color: "#10B981",
-    pale: "#E3F8EF",
-    icon: "person",
-  },
-  other: { label: "Other", color: "#F59E0B", pale: "#FEF3DC", icon: "pricetag" },
+  work: { label: "Work", color: "#3B82F6", pale: "#E6F0FF", icon: "briefcase" },
+  fitness: { label: "Fitness", color: "#F97316", pale: "#FFEDD5", icon: "barbell" },
+  wellness: { label: "Wellness", color: "#14B8A6", pale: "#DDF7F3", icon: "leaf" },
+  creative: { label: "Creative", color: "#EC4899", pale: "#FDE8F3", icon: "color-palette" },
+  hobbies: { label: "Hobbies", color: "#CA8A04", pale: "#FEF6D8", icon: "game-controller" },
+  home: { label: "Home", color: "#10B981", pale: "#E3F8EF", icon: "home" },
+  social: { label: "Social", color: "#06B6D4", pale: "#DDF6FB", icon: "people" },
+  money: { label: "Money", color: "#65A30D", pale: "#EEF7DF", icon: "cash" },
+  growth: { label: "Growth", color: "#6366F1", pale: "#E8E9FD", icon: "trending-up" },
 };
 export const PRIORITY = {
   Low: { color: "#22C55E" },

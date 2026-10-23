@@ -75,7 +75,10 @@ function Shell() {
         <Stack.Screen name="rewards" options={{ title: "Rewards" }} />
         <Stack.Screen name="shop" options={{ title: "Shop" }} />
         <Stack.Screen name="notifications" options={{ title: "Notifications" }} />
-        <Stack.Screen name="goal" options={{ title: "Daily goal" }} />
+        <Stack.Screen name="goal" options={{ title: "XP per day" }} />
+        <Stack.Screen name="skill/[id]" options={{ title: "" }} />
+        <Stack.Screen name="area/[id]" options={{ title: "" }} />
+        <Stack.Screen name="habit" options={sheet} />
       </Stack>
       <XpToast gain={gain} />
       {notice && (

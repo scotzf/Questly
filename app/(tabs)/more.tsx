@@ -68,7 +68,7 @@ export default function More() {
           <Row icon="sparkles" color="#8B5CF6" label="Plan today" onPress={() => router.push("/plan")} />
         </Card>
         <Card style={{ gap: 0, paddingVertical: 6 }}>
-          <Row icon="flag" color="#10B981" label="Daily goal" onPress={() => router.push("/goal")} />
+          <Row icon="flag" color="#10B981" label="XP per day" onPress={() => router.push("/goal")} />
           <Row icon="notifications" color="#EC4899" label="Notifications" onPress={() => router.push("/notifications")} />
           <Row icon="heart" color="#EF4444" label="Stuck?" onPress={() => router.push("/rescue")} />
           {QuestlyWidget && (

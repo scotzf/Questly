@@ -15,6 +15,7 @@ import {
   toggleTask,
 } from "../../src/domain";
 import TaskCard from "../../src/TaskCard";
+import HabitRow from "../../src/HabitRow";
 import { CATEGORIES } from "../../src/theme";
 import {
   Button,
@@ -37,7 +38,7 @@ import {
   time,
 } from "../../src/ui";
 import { useNow } from "../../src/useNow";
-const VIEWS = ["Timeline", "Board", "Diagram"] as const;
+const VIEWS = ["Timeline", "Board", "Diagram", "Habits"] as const;
 export default function Tasks() {
   const { state } = useStore();
   const now = useNow();
@@ -68,7 +69,9 @@ export default function Tasks() {
         />
         {searching && <Field placeholder="Search" value={search} onChangeText={setSearch} autoFocus />}
         <Segmented options={VIEWS} value={view} onChange={setView} />
-        {!state.tasks.length ? (
+        {view === "Habits" ? (
+          <Habits now={now} />
+        ) : !state.tasks.length ? (
           <Empty
             title="No tasks"
             action={<Button label="Add task" icon="add" onPress={() => router.push("/quick-add")} />}
@@ -298,6 +301,24 @@ function Diagram({ tasks }: { tasks: Task[] }) {
           </View>
         </View>
       </Card>
+    </>
+  );
+}
+function Habits({ now }: { now: number }) {
+  const { state } = useStore();
+  const habits = state.habits.filter((h) => !h.archived);
+  return (
+    <>
+      {habits.length ? (
+        <Card style={{ gap: 0, paddingVertical: 6 }}>
+          {habits.map((h) => (
+            <HabitRow key={h.id} habit={h} now={now} />
+          ))}
+        </Card>
+      ) : (
+        <Empty title="No habits" />
+      )}
+      <Button kind="secondary" label="New habit" icon="repeat" onPress={() => router.push("/habit")} />
     </>
   );
 }

@@ -51,7 +51,7 @@ test("chat message with weekday deadline and no time", () => {
     ],
     now,
   );
-  assert.equal(d.category, "project");
+  assert.equal(d.category, "work");
   const due = new Date(d.dueAt);
   assert.ok(due.getTime() > now.getTime(), "deadline is in the future");
   assert.equal(due.getDay(), 5);
@@ -61,6 +61,6 @@ test("no date and no bullets still yields a task", () => {
   const d = parseScan([line("Buy groceries for the week", 10, 30)], now);
   assert.equal(d.title, "Buy groceries for the week");
   assert.equal(d.dueAt, null);
-  assert.equal(d.category, "personal");
+  assert.equal(d.category, "home");
   assert.deepEqual(d.steps, []);
 });

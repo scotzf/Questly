@@ -3,7 +3,7 @@
     "name": "Questly",
     "slug": "questly",
     "scheme": "questly",
-    "version": "0.3.0",
+    "version": "0.6.1",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "icon": "./assets/icon.png",
@@ -13,7 +13,7 @@
     },
     "android": {
       "package": "com.scotzf.questly",
-      "versionCode": 3,
+      "versionCode": 7,
       "allowBackup": false,
       "blockedPermissions": [
         "android.permission.RECORD_AUDIO",
@@ -23,7 +23,9 @@
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundColor": "#E5F2ED"
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png",
+        "backgroundColor": "#3366FF"
       },
       "intentFilters": [
         {

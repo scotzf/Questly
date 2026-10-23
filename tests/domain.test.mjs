@@ -23,6 +23,7 @@ const {
   quests,
   taskXp,
   toggleStep,
+  ensureQuests,
   taskStatus,
 } =
   await import(
@@ -37,7 +38,7 @@ const task = (id, estimate, dueAt = null) => ({
   priority: "Medium",
   steps: [],
   completedAt: null,
-  createdAt: now,
+  createdAt: now - 3600000,
   updatedAt: now,
   description: "",
   course: "",
@@ -112,7 +113,7 @@ test("older saved data gains missing settings and drops focus data", () => {
 test("older tasks gain a category and reminder", () => {
   const { category, reminder, ...old } = { ...task("a", 25), category: "", reminder: 0 };
   const s = withDefaults({ tasks: [old] });
-  assert.equal(s.tasks[0].category, "other");
+  assert.equal(s.tasks[0].category, "growth");
   assert.equal(s.tasks[0].reminder, null);
   assert.equal(s.settings.notify.plan, true);
 });
@@ -141,8 +142,11 @@ test("subtasks, quests and levels add up to daily XP", () => {
   s.tasks[0] = { ...s.tasks[0], completedAt: now };
   // 3 (step) + 15 (Medium task); goal of 30 not yet reached.
   assert.equal(dayXp(s, now), 18);
+  assert.equal(quests(s, now).length, 0, "no quests until picked");
+  s = ensureQuests(s, now);
   assert.equal(quests(s, now).length, 3);
   assert.equal(quests(s, now)[0].id, "goal");
+  assert.equal(ensureQuests(s, now), s, "picked once per day");
   const week = xpByDay(s, now);
   assert.equal(week.length, 7);
   assert.equal(week.reduce((n, d) => n + d.xp, 0), 18);
@@ -155,7 +159,7 @@ test("streak freezes cover a missed day only when there are enough", async () =>
   );
   const day = 86400000;
   const s = initialState();
-  s.tasks = [{ ...task("old", 5), completedAt: now - 2 * day }];
+  s.tasks = [{ ...task("old", 5), createdAt: now - 3 * day, completedAt: now - 2 * day }];
   assert.equal(streak(s, now), 0, "yesterday was missed");
   const one = { ...s, shop: { ...s.shop, freezes: 1 } };
   const saved = applyFreezes(one, now);
@@ -165,4 +169,18 @@ test("streak freezes cover a missed day only when there are enough", async () =>
   assert.equal(none.shop.freezes, 1, "3 missed days, 1 freeze: not spent");
   assert.equal(balance(s), 7, "15 XP -> 7 coins");
   assert.equal(buy(s, "freeze"), s, "can't afford");
+});
+test("tasks ticked within 2 minutes of being added give 2 XP", () => {
+  const instant = { ...task("a", 5), priority: "High", createdAt: now - 30000, completedAt: now };
+  assert.equal(taskXp(instant), 2);
+});
+test("habits and skill milestones earn XP and keep the streak", async () => {
+  const { HABIT_XP, MILESTONE_XP, LEVEL_XP } = await import(
+    `data:text/javascript;base64,${Buffer.from(js).toString("base64")}`
+  );
+  const s = initialState();
+  s.habits = [{ id: "h", title: "Stretch", category: "fitness", days: [0, 1, 2, 3, 4, 5, 6], log: [now], createdAt: now }];
+  s.skills = { "fitness.calisthenics": { started: now, branch: null, milestones: { m1: now }, levels: { l1: now } } };
+  assert.equal(dayXp(s, now), HABIT_XP + MILESTONE_XP + LEVEL_XP);
+  assert.equal(streak(s, now), 1);
 });
