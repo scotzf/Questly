@@ -1,0 +1,24 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Run on phone",
+      "type": "shell",
+      "command": "powershell -ExecutionPolicy Bypass -File scripts/Start-Android.ps1",
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "Mirror phone",
+      "type": "shell",
+      "command": "powershell -ExecutionPolicy Bypass -File scripts/Mirror-Phone.ps1",
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "Run + mirror phone",
+      "dependsOn": ["Mirror phone", "Run on phone"],
+      "problemMatcher": []
+    }
+  ]
+}
