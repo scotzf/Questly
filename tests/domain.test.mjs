@@ -15,12 +15,14 @@ const js = ts.transpileModule(source, {
 const {
   initialState,
   proposePlan,
-  remaining,
-  elapsed,
   withDefaults,
   streak,
   progress,
-  focusByDay,
+  xpByDay,
+  dayXp,
+  quests,
+  taskXp,
+  toggleStep,
   taskStatus,
 } =
   await import(
@@ -72,31 +74,11 @@ test("insufficient availability is explicit, never extends day", () => {
   assert.equal(p.unplanned[0].minutes, 70);
   assert.ok(p.slots.every((x) => x.end <= now + 3600000));
 });
-test("completed tasks and already recorded effort are excluded", () => {
+test("completed tasks are excluded from the plan", () => {
   const s = initialState();
-  s.tasks = [{ ...task("done", 60), completedAt: now }, task("worked", 60)];
-  s.sessions = [
-    { id: "session", taskId: "worked", seconds: 2400, endedAt: now, note: "" },
-  ];
+  s.tasks = [{ ...task("done", 40), completedAt: now }, task("open", 20)];
   const p = proposePlan(s, now);
-  assert.equal(p.slots.length, 1);
-  assert.equal(p.slots[0].end - p.slots[0].start, 20 * 60000);
-});
-test("timer recovers after backgrounding and clamps after deadline", () => {
-  const timer = {
-    plannedSeconds: 1500,
-    remainingSeconds: 1500,
-    endsAt: now + 1500000,
-  };
-  assert.equal(remaining(timer, now + 900000), 600);
-  assert.equal(elapsed(timer, now + 900000), 900);
-  assert.equal(remaining(timer, now + 2000000), 0);
-  assert.equal(elapsed(timer, now + 2000000), 1500);
-});
-test("paused timer does not lose time while app is closed", () => {
-  const timer = { plannedSeconds: 1500, remainingSeconds: 800, endsAt: null };
-  assert.equal(remaining(timer, now + 999999999), 800);
-  assert.equal(elapsed(timer, now + 999999999), 700);
+  assert.ok(p.slots.every((x) => x.taskId === "open"));
 });
 test("after study hours all remaining work is reported", () => {
   const s = initialState();
@@ -114,44 +96,73 @@ test("replanning does not overlap a block already in progress", () => {
   const p = proposePlan(s, now);
   assert.ok(p.slots[0].start >= now + 900000);
 });
-test("older saved data gains missing settings and fields", () => {
-  const s = withDefaults({ tasks: [], settings: { onboarded: true, name: "A" } });
+test("older saved data gains missing settings and drops focus data", () => {
+  const s = withDefaults({
+    tasks: [],
+    timer: { id: "x" },
+    sessions: [{ id: "1" }],
+    settings: { onboarded: true, name: "A" },
+  });
   assert.equal(s.settings.dayStart, 9);
+  assert.equal(s.settings.dailyGoal, 30);
   assert.equal(s.settings.name, "A");
-  assert.deepEqual(s.sessions, []);
-  assert.equal(s.timer, null);
+  assert.equal("timer" in s, false);
+  assert.equal("sessions" in s, false);
 });
 test("older tasks gain a category and reminder", () => {
   const { category, reminder, ...old } = { ...task("a", 25), category: "", reminder: 0 };
   const s = withDefaults({ tasks: [old] });
   assert.equal(s.tasks[0].category, "other");
   assert.equal(s.tasks[0].reminder, null);
-  assert.equal(s.settings.notify.tasks, true);
+  assert.equal(s.settings.notify.plan, true);
 });
-test("streak counts consecutive active days and tolerates an open today", () => {
+test("task XP rewards priority and beating the deadline", () => {
+  assert.equal(taskXp({ ...task("a", 5), priority: "Low", completedAt: now }), 10);
+  assert.equal(taskXp({ ...task("a", 5), priority: "High", completedAt: now }), 20);
+  assert.equal(
+    taskXp({ ...task("a", 5, now + 1000), completedAt: now }),
+    20,
+    "Medium (+5) and early (+5)",
+  );
+});
+test("streak counts consecutive days with a completion and tolerates an open today", () => {
   const s = initialState();
   const day = 86400000;
-  s.sessions = [1, 2, 3].map((n) => ({
-    id: String(n),
-    taskId: "a",
-    seconds: 600,
-    endedAt: now - n * day,
-    note: "",
-  }));
+  s.tasks = [1, 2, 3].map((n) => ({ ...task(`t${n}`, 5), completedAt: now - n * day }));
   assert.equal(streak(s, now), 3);
-  s.sessions.push({ id: "t", taskId: "a", seconds: 60, endedAt: now, note: "" });
+  s.tasks.push({ ...task("today", 5), completedAt: now });
   assert.equal(streak(s, now), 4);
 });
-test("xp, level and week chart come from sessions and completions", () => {
-  const s = initialState();
-  s.tasks = [{ ...task("a", 25), completedAt: now }];
-  s.sessions = [{ id: "1", taskId: "a", seconds: 600 * 60, endedAt: now, note: "" }];
-  const p = progress(s);
-  assert.equal(p.xp, 620);
-  assert.equal(p.level, 2);
-  assert.equal(p.levelXp, 120);
-  const week = focusByDay(s.sessions, now);
+test("subtasks, quests and levels add up to daily XP", () => {
+  let s = initialState();
+  s.tasks = [{ ...task("a", 25), steps: [{ id: "s1", title: "x", done: false }] }];
+  s = toggleStep(s, "a", "s1", now);
+  assert.equal(dayXp(s, now), 3);
+  s.tasks[0] = { ...s.tasks[0], completedAt: now };
+  // 3 (step) + 15 (Medium task); goal of 30 not yet reached.
+  assert.equal(dayXp(s, now), 18);
+  assert.equal(quests(s, now).length, 3);
+  assert.equal(quests(s, now)[0].id, "goal");
+  const week = xpByDay(s, now);
   assert.equal(week.length, 7);
-  assert.equal(week.reduce((n, d) => n + d.minutes, 0), 600);
-  assert.equal(taskStatus(s.tasks[0], s.sessions), "done");
+  assert.equal(week.reduce((n, d) => n + d.xp, 0), 18);
+  assert.equal(taskStatus(s.tasks[0]), "done");
+  assert.equal(progress(s).level, 1);
+});
+test("streak freezes cover a missed day only when there are enough", async () => {
+  const { applyFreezes, buy, balance } = await import(
+    `data:text/javascript;base64,${Buffer.from(js).toString("base64")}`
+  );
+  const day = 86400000;
+  const s = initialState();
+  s.tasks = [{ ...task("old", 5), completedAt: now - 2 * day }];
+  assert.equal(streak(s, now), 0, "yesterday was missed");
+  const one = { ...s, shop: { ...s.shop, freezes: 1 } };
+  const saved = applyFreezes(one, now);
+  assert.equal(saved.shop.freezes, 0);
+  assert.equal(streak(saved, now), 2);
+  const none = applyFreezes({ ...s, tasks: [{ ...task("x", 5), completedAt: now - 4 * day }], shop: { ...s.shop, freezes: 1 } }, now);
+  assert.equal(none.shop.freezes, 1, "3 missed days, 1 freeze: not spent");
+  assert.equal(balance(s), 7, "15 XP -> 7 coins");
+  assert.equal(buy(s, "freeze"), s, "can't afford");
 });

@@ -14,7 +14,7 @@ if ($LASTEXITCODE -ge 8) { throw "copy failed" }
 Set-Location $dst
 npm ci --no-audit --no-fund
 if ($LASTEXITCODE) { throw "npm ci failed" }
-npx.cmd expo prebuild --platform android --no-install
+npx.cmd expo prebuild --platform android --no-install --clean
 if ($LASTEXITCODE) { throw "prebuild failed" }
 
 # CMake 3.31+ ships a ninja that handles long Windows paths.
@@ -28,8 +28,15 @@ Set-Location android
 if ($LASTEXITCODE) { throw "gradle failed" }
 
 $apk = (Get-ChildItem app\build\outputs\apk\release\*.apk | Select-Object -First 1).FullName
+$app = (Get-Content "$dst\app.json" -Raw | ConvertFrom-Json).expo
+$copy = Join-Path ([Environment]::GetFolderPath('Desktop')) "$($app.name)-$($app.version).apk"
+Copy-Item $apk $copy -Force
+"APK: $copy"
+
 $target = if ($DeviceId) { @('-s', $DeviceId) } else { @() }
+$state = try { adb @target get-state 2>$null } catch { $null }
+if ($state -ne 'device') { "No phone connected - skipped install"; return }
 adb @target install -r $apk
-if ($LASTEXITCODE) { throw "Built $apk but install failed - is the phone plugged in?" }
-adb @target shell monkey -p com.focuspal.app -c android.intent.category.LAUNCHER 1 | Out-Null
-"Installed $apk"
+if ($LASTEXITCODE) { throw "Install failed" }
+adb @target shell monkey -p $app.android.package -c android.intent.category.LAUNCHER 1 | Out-Null
+"Installed on phone"

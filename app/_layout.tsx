@@ -1,19 +1,33 @@
 import React, { useEffect } from "react";
 import { Stack, router } from "expo-router";
-import { ActivityIndicator, Linking, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, AppState, Linking, Pressable, Text, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
 import { StoreProvider, useStore } from "../src/store";
-import { Button, C, ErrorText, Icon, s } from "../src/ui";
+import { Button, C, ErrorText, Icon, XpToast, s } from "../src/ui";
 import { listenForReminder } from "../src/reminders";
+import { scanImage } from "../src/scanImage";
+import TextScan from "../modules/text-scan";
 function Shell() {
-  const { ready, error, retry, state, notice, clearNotice } = useStore();
+  const { ready, error, retry, state, notice, clearNotice, gain } = useStore();
   useEffect(() => {
     if (ready && state.settings.onboarded)
       return listenForReminder((id) =>
         router.push({ pathname: "/task/[id]", params: { id } }),
       );
+  }, [ready, state.settings.onboarded]);
+  // Images shared to the app (Share → Questly) become a prefilled task.
+  useEffect(() => {
+    if (!ready || !state.settings.onboarded || !TextScan) return;
+    const check = () =>
+      void TextScan!
+        .takeSharedImage()
+        .then((uri) => (uri ? scanImage(uri) : undefined))
+        .catch(() => {});
+    check();
+    const sub = AppState.addEventListener("change", (s) => s === "active" && check());
+    return () => sub.remove();
   }, [ready, state.settings.onboarded]);
   if (!ready)
     return (
@@ -59,9 +73,11 @@ function Shell() {
         <Stack.Screen name="rescue" options={{ title: "Stuck?", presentation: "modal" }} />
         <Stack.Screen name="stats" options={{ title: "Statistics" }} />
         <Stack.Screen name="rewards" options={{ title: "Rewards" }} />
+        <Stack.Screen name="shop" options={{ title: "Shop" }} />
         <Stack.Screen name="notifications" options={{ title: "Notifications" }} />
-        <Stack.Screen name="focus-settings" options={{ title: "Focus settings" }} />
+        <Stack.Screen name="goal" options={{ title: "Daily goal" }} />
       </Stack>
+      <XpToast gain={gain} />
       {notice && (
         <View
           style={[

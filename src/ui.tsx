@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -26,6 +26,7 @@ import Svg, {
 import { C, shadow } from "./theme";
 import { dayKey, startOfDay, weekDays } from "./domain";
 import { useNow } from "./useNow";
+import { useStore, type Gain } from "./store";
 export { C } from "./theme";
 export type IconName = React.ComponentProps<typeof Ionicons>["name"];
 export const haptic = (kind: "success" | "tap" = "tap") =>
@@ -73,13 +74,64 @@ export function IconTile({
 }
 export type Mood = "happy" | "calm" | "neutral";
 /** Pal: a small cat-robot with a glowing visor. */
+/** Outfit artwork drawn over Pal (viewBox 0 0 120 120). */
+function Outfit({ id }: { id: string }) {
+  switch (id) {
+    case "glasses":
+      return (
+        <>
+          <Circle cx={49} cy={53} r={10} stroke="#111827" strokeWidth={3} fill="rgba(255,255,255,0.12)" />
+          <Circle cx={71} cy={53} r={10} stroke="#111827" strokeWidth={3} fill="rgba(255,255,255,0.12)" />
+          <Path d="M59 52 L61 52" stroke="#111827" strokeWidth={3} />
+        </>
+      );
+    case "scarf":
+      return (
+        <>
+          <Rect x={33} y={73} width={54} height={10} rx={5} fill="#EF4444" />
+          <Rect x={66} y={78} width={11} height={22} rx={4} fill="#DC2626" />
+        </>
+      );
+    case "party":
+      return (
+        <>
+          <Path d="M47 25 L60 0 L73 25 Z" fill="#EC4899" />
+          <Path d="M51 17 L69 17 M55 9 L65 9" stroke="#FDE68A" strokeWidth={3} />
+          <Circle cx={60} cy={2} r={4} fill="#FDE68A" />
+        </>
+      );
+    case "wizard":
+      return (
+        <>
+          <Path d="M42 24 Q58 -8 80 4 Q68 8 78 24 Z" fill="#6D28D9" />
+          <Ellipse cx={60} cy={24} rx={30} ry={5} fill="#5B21B6" />
+          <Circle cx={58} cy={13} r={2.5} fill="#FDE68A" />
+          <Circle cx={68} cy={18} r={1.8} fill="#FDE68A" />
+        </>
+      );
+    case "crown":
+      return (
+        <>
+          <Path d="M41 22 L44 4 L53 13 L60 1 L67 13 L76 4 L79 22 Z" fill="#F5B301" stroke="#D97706" strokeWidth={1.5} />
+          <Circle cx={60} cy={15} r={3} fill="#EF4444" />
+        </>
+      );
+    default:
+      return null;
+  }
+}
 export function Mascot({
   size = 92,
   mood = "happy",
+  outfit,
 }: {
   size?: number;
   mood?: Mood;
+  /** Defaults to the outfit Pal is wearing; pass null for none. */
+  outfit?: string | null;
 }) {
+  const store = useStore();
+  const wearing = outfit === undefined ? (store?.state.shop.outfit ?? null) : outfit;
   const glow = "#67E8F9";
   const eye = (x: number) =>
     mood === "neutral" ? (
@@ -124,10 +176,11 @@ export function Mascot({
       <Path d="M20 46 Q20 8 60 8 Q100 8 100 46" stroke={C.primary} strokeWidth={5} fill="none" strokeLinecap="round" />
       <Rect x={13} y={42} width={13} height={26} rx={6.5} fill={C.primary} />
       <Rect x={94} y={42} width={13} height={26} rx={6.5} fill={C.primary} />
+      {wearing && <Outfit id={wearing} />}
     </Svg>
   );
 }
-/** Layered mountain landscape; `night` is the focus-mode variant. */
+/** Layered mountain landscape; `night` is a darker evening variant. */
 export function Scene({
   variant = "dawn",
   style,
@@ -802,3 +855,46 @@ export const s = StyleSheet.create({
   },
   section: { marginTop: 8, marginBottom: 12 },
 });
+/** "+15 XP" pop; a bigger card with Pal when the daily goal is reached. */
+export function XpToast({ gain }: { gain: Gain | null }) {
+  const [anim] = useState(() => new Animated.Value(0));
+  useEffect(() => {
+    if (!gain) return;
+    if (gain.goal) haptic("success");
+    anim.setValue(0);
+    Animated.sequence([
+      Animated.spring(anim, { toValue: 1, friction: 5, useNativeDriver: true }),
+      Animated.delay(gain.goal ? 1800 : 800),
+      Animated.timing(anim, { toValue: 0, duration: 250, useNativeDriver: true }),
+    ]).start();
+  }, [gain, anim]);
+  if (!gain) return null;
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        top: gain.goal ? "30%" : 70,
+        alignSelf: "center",
+        opacity: anim,
+        transform: [
+          { translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [-24, 0] }) },
+          { scale: anim.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] }) },
+        ],
+      }}
+    >
+      {gain.goal ? (
+        <View style={[s.card, { alignItems: "center", paddingHorizontal: 36, paddingVertical: 24 }]}>
+          <Mascot size={110} mood="happy" />
+          <Text style={s.h1}>Daily goal!</Text>
+          <Pill label={`+${gain.xp} XP`} icon="star" color={C.gold} />
+        </View>
+      ) : (
+        <View style={[s.row, shadow, { gap: 6, backgroundColor: C.gold, borderRadius: 999, paddingHorizontal: 18, paddingVertical: 10 }]}>
+          <Icon name="star" color={C.white} size={18} />
+          <Text style={{ color: C.white, fontWeight: "800", fontSize: 18 }}>+{gain.xp} XP</Text>
+        </View>
+      )}
+    </Animated.View>
+  );
+}

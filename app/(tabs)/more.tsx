@@ -3,14 +3,17 @@ import { Pressable, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { useStore } from "../../src/store";
-import { initialState, progress } from "../../src/domain";
+import QuestlyWidget from "../../modules/questly-widget";
+import { balance, initialState, progress } from "../../src/domain";
 import { confirm } from "../../src/confirm";
 import { C, Card, Header, Icon, Mascot, Pill, Row, Screen, s } from "../../src/ui";
 export default function More() {
   const { state, update } = useStore();
   const [editing, setEditing] = useState(false);
+  const [widgetHint, setWidgetHint] = useState(false);
   const [name, setName] = useState(state.settings.name);
-  const { level, coins } = progress(state);
+  const { level } = progress(state);
+  const coins = balance(state);
   function saveName() {
     setEditing(false);
     if (name.trim() !== state.settings.name)
@@ -61,12 +64,22 @@ export default function More() {
         <Card style={{ gap: 0, paddingVertical: 6 }}>
           <Row icon="stats-chart" color="#3B82F6" label="Statistics" onPress={() => router.push("/stats")} />
           <Row icon="trophy" color="#F59E0B" label="Rewards" onPress={() => router.push("/rewards")} />
+          <Row icon="bag-handle" color="#EC4899" label="Shop" onPress={() => router.push("/shop")} />
           <Row icon="sparkles" color="#8B5CF6" label="Plan today" onPress={() => router.push("/plan")} />
         </Card>
         <Card style={{ gap: 0, paddingVertical: 6 }}>
-          <Row icon="timer" color="#10B981" label="Focus settings" onPress={() => router.push("/focus-settings")} />
+          <Row icon="flag" color="#10B981" label="Daily goal" onPress={() => router.push("/goal")} />
           <Row icon="notifications" color="#EC4899" label="Notifications" onPress={() => router.push("/notifications")} />
           <Row icon="heart" color="#EF4444" label="Stuck?" onPress={() => router.push("/rescue")} />
+          {QuestlyWidget && (
+            <Row
+              icon="apps"
+              color="#0EA5E9"
+              label="Add widget"
+              onPress={() => void QuestlyWidget!.requestPin().then((ok) => setWidgetHint(!ok))}
+              right={widgetHint ? <Text style={s.small}>Home screen → Widgets</Text> : undefined}
+            />
+          )}
         </Card>
         <Card style={{ gap: 0, paddingVertical: 6 }}>
           <Row

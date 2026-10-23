@@ -1,23 +1,19 @@
 import React from "react";
-import { Text, View } from "react-native";
+import { Text } from "react-native";
 import { useStore } from "../src/store";
 import { Settings } from "../src/domain";
-import { Card, Chip, Row, Screen, Stepper, s } from "../src/ui";
+import { GoalPicker } from "../src/GoalPicker";
+import { Card, Row, Screen, Stepper, s } from "../src/ui";
 const hour = (h: number) => `${h}:00`;
-export default function FocusSettings() {
+export default function Goal() {
   const { state, update } = useStore();
   const set = (patch: Partial<Settings>) =>
     void update((v) => ({ ...v, settings: { ...v.settings, ...patch } }));
-  const { dayStart, dayEnd, focusMinutes } = state.settings;
+  const { dayStart, dayEnd, dailyGoal } = state.settings;
   return (
     <Screen>
-      <Text style={[s.h2, s.section]}>Session</Text>
-      <View style={[s.row, { flexWrap: "wrap", gap: 8, marginBottom: 22 }]}>
-        {[15, 25, 45, 60, 90].map((m) => (
-          <Chip key={m} label={`${m}m`} icon="timer-outline" selected={focusMinutes === m} onPress={() => set({ focusMinutes: m })} />
-        ))}
-      </View>
-      <Text style={[s.h2, s.section]}>Study Hours</Text>
+      <GoalPicker value={dailyGoal} onChange={(n) => set({ dailyGoal: n })} />
+      <Text style={[s.h2, s.section, { marginTop: 24 }]}>Study Hours</Text>
       <Card style={{ gap: 0, paddingVertical: 6 }}>
         <Row
           icon="sunny"

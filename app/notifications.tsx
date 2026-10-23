@@ -8,7 +8,7 @@ const hour = (h: number) => `${h}:00`;
 const TYPES: [keyof Settings["notify"], string, string, React.ComponentProps<typeof Row>["icon"]][] = [
   ["tasks", "Task reminders", "#3B82F6", "alarm"],
   ["deadlines", "Deadlines", "#EF4444", "flag"],
-  ["focus", "Focus sessions", "#10B981", "timer"],
+  ["plan", "Planned blocks", "#10B981", "time"],
   ["daily", "Daily summary", "#8B5CF6", "today"],
 ];
 export default function Notifications() {

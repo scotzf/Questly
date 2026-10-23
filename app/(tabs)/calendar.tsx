@@ -91,7 +91,7 @@ export default function Calendar() {
                     pressed && { transform: [{ scale: 0.98 }] },
                   ]}
                 >
-                  <Icon name={b.focus ? "timer" : cat.icon} color={b.focus ? C.primary : cat.color} size={18} />
+                  <Icon name={b.focus ? "time" : cat.icon} color={b.focus ? C.primary : cat.color} size={18} />
                   <Text style={[s.h3, { flex: 1 }]} numberOfLines={1}>
                     {t.title}
                   </Text>

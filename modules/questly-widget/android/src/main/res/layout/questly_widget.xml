@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:id="@+id/root"
+  android:layout_width="match_parent"
+  android:layout_height="match_parent"
+  android:background="@drawable/questly_widget_bg"
+  android:orientation="vertical"
+  android:padding="16dp">
+
+  <LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:orientation="horizontal">
+
+    <TextView
+      android:id="@+id/streak"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:text="🔥 0"
+      android:textColor="#F97316"
+      android:textSize="16sp"
+      android:textStyle="bold" />
+
+    <TextView
+      android:id="@+id/coins"
+      android:layout_width="0dp"
+      android:layout_height="wrap_content"
+      android:layout_marginStart="14dp"
+      android:layout_weight="1"
+      android:text="🪙 0"
+      android:textColor="#B45309"
+      android:textSize="16sp"
+      android:textStyle="bold" />
+
+    <TextView
+      android:id="@+id/level"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:text="Lv 1"
+      android:textColor="#3366FF"
+      android:textSize="16sp"
+      android:textStyle="bold" />
+  </LinearLayout>
+
+  <TextView
+    android:id="@+id/goal"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="8dp"
+    android:text="0 / 30 XP"
+    android:textColor="#111827"
+    android:textSize="22sp"
+    android:textStyle="bold" />
+
+  <ProgressBar
+    android:id="@+id/bar"
+    style="@android:style/Widget.ProgressBar.Horizontal"
+    android:layout_width="match_parent"
+    android:layout_height="10dp"
+    android:layout_marginTop="6dp"
+    android:max="100"
+    android:progress="0"
+    android:progressBackgroundTint="#E9EDF5"
+    android:progressTint="#3366FF" />
+
+  <TextView
+    android:id="@+id/next"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="10dp"
+    android:ellipsize="end"
+    android:maxLines="1"
+    android:text="All clear"
+    android:textColor="#374151"
+    android:textSize="15sp"
+    android:textStyle="bold" />
+</LinearLayout>

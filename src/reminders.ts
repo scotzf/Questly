@@ -21,7 +21,7 @@ export async function syncReminders(state: State) {
   const pending = await Notifications.getAllScheduledNotificationsAsync();
   await Promise.all(
     pending
-      .filter((n) => n.identifier.startsWith("focuspal-"))
+      .filter((n) => n.identifier.startsWith("questly-"))
       .map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)),
   );
   if (!state.settings.reminders) return;
@@ -35,21 +35,14 @@ export async function syncReminders(state: State) {
       : h >= quietStart && h < quietEnd;
   };
   const events: { id: string; taskId: string; at: number; body: string }[] =
-    notify.focus
+    notify.plan
       ? state.slots.map((s) => ({
           id: s.id,
           taskId: s.taskId,
           at: s.start,
-          body: "Focus time",
+          body: "Time to start",
         }))
       : [];
-  if (state.timer?.endsAt)
-    events.push({
-      id: `timer-${state.timer.id}`,
-      taskId: state.timer.taskId,
-      at: state.timer.endsAt,
-      body: "Session done",
-    });
   for (const t of state.tasks.filter((t) => !t.completedAt && t.dueAt)) {
     if (notify.tasks && t.reminder !== null)
       events.push({
@@ -68,7 +61,7 @@ export async function syncReminders(state: State) {
   }
   if (notify.daily)
     await Notifications.scheduleNotificationAsync({
-      identifier: "focuspal-daily",
+      identifier: "questly-daily",
       content: {
         title: "Today",
         body: `${state.tasks.filter((t) => !t.completedAt).length} tasks open`,
@@ -81,7 +74,7 @@ export async function syncReminders(state: State) {
       },
     });
   for (const event of events
-    .filter((e) => e.at > Date.now() && (e.id.startsWith("timer-") || !quiet(e.at)))
+    .filter((e) => e.at > Date.now() && !quiet(e.at))
     .sort((a, b) => a.at - b.at)
     .slice(0, 50)) {
     const task = state.tasks.find(
@@ -89,7 +82,7 @@ export async function syncReminders(state: State) {
     );
     if (!task) continue;
     await Notifications.scheduleNotificationAsync({
-      identifier: `focuspal-${event.id}`,
+      identifier: `questly-${event.id}`,
       content: {
         title: task.title,
         body: event.body,

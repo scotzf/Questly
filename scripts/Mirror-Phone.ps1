@@ -10,6 +10,6 @@ if (-not $scrcpy) {
 $adb = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
 $env:ADB = $adb
 
-$args = @('--window-title', 'FocusPal phone', '--stay-awake', '--max-size', '1600')
+$args = @('--window-title', 'Questly phone', '--stay-awake', '--max-size', '1600')
 if ($DeviceId) { $args += @('--serial', $DeviceId) }
 & $scrcpy @args

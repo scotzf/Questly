@@ -8,22 +8,18 @@ const answers = {
   Overwhelmed: {
     icon: "layers-outline",
     title: "Just 2 minutes.",
-    minutes: 2,
   },
   "Not sure how": {
     icon: "help-circle-outline",
     title: "Pick one tiny step.",
-    minutes: 5,
   },
   Distracted: {
     icon: "notifications-off-outline",
     title: "Do Not Disturb, then 5 minutes.",
-    minutes: 5,
   },
   Tired: {
     icon: "cafe-outline",
     title: "Water. Short break.",
-    minutes: 5,
   },
 } as const;
 export default function Rescue() {
@@ -98,16 +94,10 @@ export default function Rescue() {
           ) : task ? (
             <>
               <Button
-                icon="play"
-                label={`Start ${answer.minutes} min`}
+                icon="arrow-forward"
+                label="Open task"
                 onPress={() =>
-                  router.replace({
-                    pathname: "/(tabs)/focus",
-                    params: {
-                      taskId: task.id,
-                      minutes: String(answer.minutes),
-                    },
-                  })
+                  router.replace({ pathname: "/task/[id]", params: { id: task.id } })
                 }
               />
               {choice === "Not sure how" && (

@@ -3,15 +3,19 @@ import {
   KeyboardAvoidingView,
   Pressable,
   ScrollView,
+  Text,
   TextInput,
   View,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
+import * as ImagePicker from "expo-image-picker";
+import TextScan from "../modules/text-scan";
+import { scanImage } from "../src/scanImage";
 import * as Crypto from "expo-crypto";
 import { useStore } from "../src/store";
 import { CategoryId, dayKey, newTask, startOfDay } from "../src/domain";
 import { CATEGORIES, PRIORITY } from "../src/theme";
-import { Button, C, Chip, IconButton, date, haptic, s } from "../src/ui";
+import { C, Chip, ErrorText, Icon, IconButton, date, haptic, s } from "../src/ui";
 const at = (day: number, hour: number) => {
   const d = new Date(day);
   d.setHours(hour, 0, 0, 0);
@@ -36,6 +40,28 @@ export default function QuickAdd() {
   const [day, setDay] = useState<number | null>(picked ?? today);
   const [high, setHigh] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [scanError, setScanError] = useState("");
+  async function scan(source: "camera" | "library") {
+    if (!TextScan || busy) return;
+    setScanError("");
+    if (source === "camera" && !(await ImagePicker.requestCameraPermissionsAsync()).granted) {
+      setScanError("Camera blocked");
+      return;
+    }
+    const pick = await (source === "camera"
+      ? ImagePicker.launchCameraAsync({ mediaTypes: "images", quality: 1 })
+      : ImagePicker.launchImageLibraryAsync({ mediaTypes: "images", quality: 1 }));
+    if (pick.canceled) return;
+    setBusy(true);
+    try {
+      await scanImage(pick.assets[0].uri, true);
+      haptic("success");
+    } catch {
+      setScanError("No text found");
+    } finally {
+      setBusy(false);
+    }
+  }
   async function add() {
     if (!title.trim() || busy) return;
     setBusy(true);
@@ -100,6 +126,23 @@ export default function QuickAdd() {
               setHigh(!high);
             }}
           />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Add"
+            disabled={!title.trim() || busy}
+            onPress={() => void add()}
+            style={({ pressed }) => ({
+              width: 48,
+              height: 48,
+              borderRadius: 16,
+              backgroundColor: title.trim() ? C.primary : C.line,
+              alignItems: "center",
+              justifyContent: "center",
+              transform: [{ scale: pressed ? 0.92 : 1 }],
+            })}
+          >
+            <Icon name="arrow-up" color={C.white} size={24} />
+          </Pressable>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }} keyboardShouldPersistTaps="handled">
           {(Object.keys(CATEGORIES) as CategoryId[]).map((id) => (
@@ -125,22 +168,22 @@ export default function QuickAdd() {
             />
           ))}
         </ScrollView>
+        <ErrorText message={scanError} />
         <View style={s.row}>
-          <Button
-            kind="secondary"
-            label="More"
-            icon="options-outline"
-            style={{ flex: 1 }}
+          <Pressable
+            accessibilityRole="button"
             onPress={() => router.replace({ pathname: "/editor", params: { title } })}
-          />
-          <Button
-            label="Add"
-            icon="arrow-up"
-            busy={busy}
-            disabled={!title.trim()}
-            style={{ flex: 2 }}
-            onPress={() => void add()}
-          />
+            style={[s.row, { gap: 6, flex: 1, minHeight: 44 }]}
+          >
+            <Icon name="options-outline" color={C.primary} size={18} />
+            <Text style={{ color: C.primary, fontWeight: "700" }}>More</Text>
+          </Pressable>
+          {TextScan && (
+            <>
+              <IconButton name="camera" label="Scan with camera" color={C.primary} onPress={() => void scan("camera")} />
+              <IconButton name="image" label="Scan a screenshot" color={C.primary} onPress={() => void scan("library")} />
+            </>
+          )}
         </View>
       </View>
     </KeyboardAvoidingView>

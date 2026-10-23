@@ -1,7 +1,7 @@
 import React from "react";
 import { Text, View } from "react-native";
 import { useStore } from "../src/store";
-import { XP_PER_LEVEL, achievements, progress } from "../src/domain";
+import { XP_PER_LEVEL, achievements, balance, progress } from "../src/domain";
 import { shadow } from "../src/theme";
 import {
   C,
@@ -19,7 +19,8 @@ import {
 const TINTS = ["#3B82F6", "#F97316", "#06B6D4", "#F59E0B", "#8B5CF6"];
 export default function Rewards() {
   const { state } = useStore();
-  const { coins, level, levelXp } = progress(state);
+  const { level, levelXp } = progress(state);
+  const coins = balance(state);
   const list = achievements(state);
   const earned = list.filter((a) => a.value >= a.goal).length;
   return (

@@ -35,16 +35,14 @@ export default function TaskCard({
   now: number;
   showTime?: boolean;
 }) {
-  const { update, state } = useStore();
+  const { update } = useStore();
   const cat = CATEGORIES[task.category];
   const overdue = !!task.dueAt && task.dueAt < now && !task.completedAt;
-  const locked = state.timer?.taskId === task.id;
   const done = task.steps.filter((x) => x.done).length;
   const swipe = useRef<SwipeableMethods>(null);
   return (
     <Swipeable
       ref={swipe}
-      enabled={!locked}
       friction={1.6}
       leftThreshold={70}
       rightThreshold={70}
@@ -103,13 +101,11 @@ export default function TaskCard({
             )}
           </View>
         </View>
-        {!locked && (
-          <Check
-            done={!!task.completedAt}
-            color={cat.color}
-            onPress={() => void update((v) => toggleTask(v, task.id))}
-          />
-        )}
+        <Check
+          done={!!task.completedAt}
+          color={cat.color}
+          onPress={() => void update((v) => toggleTask(v, task.id))}
+        />
       </Pressable>
     </Swipeable>
   );

@@ -3,7 +3,7 @@ import { initialState, State, withDefaults } from "./domain";
 let database: Promise<SQLite.SQLiteDatabase> | undefined;
 async function db() {
   database ??= (async () => {
-    const value = await SQLite.openDatabaseAsync("focuspal.db");
+    const value = await SQLite.openDatabaseAsync("questly.db");
     await value.execAsync(
       "PRAGMA journal_mode = WAL; CREATE TABLE IF NOT EXISTS app_state (id INTEGER PRIMARY KEY CHECK (id = 1), payload TEXT NOT NULL); PRAGMA user_version = 1;",
     );

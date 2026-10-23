@@ -147,11 +147,11 @@ const COLUMNS: [TaskStatus, string, string][] = [
   ["done", "Completed", C.success],
 ];
 function Board({ tasks }: { tasks: Task[] }) {
-  const { state, update } = useStore();
+  const { update } = useStore();
   return (
     <>
       {COLUMNS.map(([status, title, color]) => {
-        const items = sortTasks(tasks.filter((t) => taskStatus(t, state.sessions) === status));
+        const items = sortTasks(tasks.filter((t) => taskStatus(t) === status));
         return (
           <Card key={status} style={{ gap: 4 }}>
             <Group title={title} color={color} count={items.length} />
@@ -163,16 +163,12 @@ function Board({ tasks }: { tasks: Task[] }) {
                   onPress={() => router.push({ pathname: "/task/[id]", params: { id: t.id } })}
                   style={[s.row, { minHeight: 52 }]}
                 >
-                  {state.timer?.taskId === t.id ? (
-                    <Icon name="timer" color={cat.color} size={26} />
-                  ) : (
-                    <Check
-                      done={!!t.completedAt}
-                      color={cat.color}
-                      size={24}
-                      onPress={() => void update((v) => toggleTask(v, t.id))}
-                    />
-                  )}
+                  <Check
+                    done={!!t.completedAt}
+                    color={cat.color}
+                    size={24}
+                    onPress={() => void update((v) => toggleTask(v, t.id))}
+                  />
                   <Text
                     numberOfLines={1}
                     style={[

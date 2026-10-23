@@ -8,12 +8,11 @@ import { useStore } from "../src/store";
 import {
   CategoryId,
   bestStreak,
-  categoryMinutes,
-  focusByDay,
-  formatMinutes,
+  categoryCounts,
   startOfDay,
   streak,
   weekDays,
+  xpByDay,
 } from "../src/domain";
 import { CATEGORIES, shadow } from "../src/theme";
 import {
@@ -65,19 +64,19 @@ export default function Stats() {
   const { state } = useStore();
   const now = useNow();
   const card = useRef<React.ComponentRef<typeof View>>(null);
-  const week = focusByDay(state.sessions, now);
-  const lastWeek = focusByDay(state.sessions, now - 7 * 86400000);
-  const total = week.reduce((n, d) => n + d.minutes, 0);
-  const before = lastWeek.reduce((n, d) => n + d.minutes, 0);
+  const week = xpByDay(state, now);
+  const lastWeek = xpByDay(state, now - 7 * 86400000);
+  const total = week.reduce((n, d) => n + d.xp, 0);
+  const before = lastWeek.reduce((n, d) => n + d.xp, 0);
   const delta = before ? Math.round(((total - before) / before) * 100) : null;
-  const max = Math.max(30, ...week.map((d) => d.minutes));
+  const max = Math.max(state.settings.dailyGoal, ...week.map((d) => d.xp));
   const todayIndex = week.findIndex((d) => d.day === startOfDay(now));
   const [weekStart] = weekDays(now);
   const weekEnd = weekStart + 7 * 86400000;
   const inWeek = (t?: number | null) => !!t && t >= weekStart && t < weekEnd;
   const weekTasks = state.tasks.filter((t) => inWeek(t.dueAt) || inWeek(t.completedAt));
   const weekDone = weekTasks.filter((t) => t.completedAt).length;
-  const cats = categoryMinutes(state);
+  const cats = categoryCounts(state);
   const catTotal = Object.values(cats).reduce((n, m) => n + (m ?? 0), 0);
   const parts = (Object.keys(CATEGORIES) as CategoryId[])
     .filter((c) => (cats[c] ?? 0) > 0)
@@ -110,7 +109,7 @@ export default function Stats() {
           <View style={[s.row, { alignItems: "flex-start" }]}>
             <View style={{ flex: 1, gap: 4 }}>
               <Text style={{ color: "#C9D6FF", fontWeight: "700" }}>This week</Text>
-              <Text style={[s.big, { color: C.white }]}>{formatMinutes(total)}</Text>
+              <Text style={[s.big, { color: C.white }]}>{total} XP</Text>
               <View style={[s.row, { gap: 6 }]}>
                 {delta !== null && (
                   <Pill
@@ -131,7 +130,7 @@ export default function Stats() {
                 <View style={{ flex: 1, justifyContent: "flex-end", width: "100%" }}>
                   <View
                     style={{
-                      height: `${Math.max(4, (d.minutes / max) * 100)}%`,
+                      height: `${Math.max(4, (d.xp / max) * 100)}%`,
                       borderRadius: 8,
                       backgroundColor: i === todayIndex ? C.white : "rgba(255,255,255,0.45)",
                     }}
@@ -144,8 +143,8 @@ export default function Stats() {
             ))}
           </View>
           <View style={[s.row, { gap: 6 }]}>
-            <Icon name="timer" color="#C9D6FF" size={14} />
-            <Text style={{ color: "#C9D6FF", fontSize: 12, fontWeight: "700" }}>FocusPal</Text>
+            <Icon name="star" color="#C9D6FF" size={14} />
+            <Text style={{ color: "#C9D6FF", fontSize: 12, fontWeight: "700" }}>Questly</Text>
           </View>
         </View>
         <Card>

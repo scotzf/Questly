@@ -47,14 +47,6 @@ export default function Plan() {
           color={C.primary}
           label={`${state.settings.dayStart}:00 – ${state.settings.dayEnd}:00`}
         />
-        {state.timer && (
-          <Pill
-            icon="timer-outline"
-            label="Focus running"
-            color={C.gold}
-            background={C.warningPale}
-          />
-        )}
       </View>
       {plan.slots.map((slot) => {
         const task = state.tasks.find((t) => t.id === slot.taskId);
@@ -114,7 +106,7 @@ export default function Plan() {
         <Empty title="All planned" />
       )}
       <ErrorText message={error} />
-      {plan.slots.length > 0 && !state.timer && (
+      {plan.slots.length > 0 && (
         <Button
           label="Use this plan"
           icon="checkmark"

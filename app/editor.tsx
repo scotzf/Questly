@@ -18,6 +18,7 @@ import {
   s,
 } from "../src/ui";
 import DateField from "../src/DateField";
+import type { ScanDraft } from "../src/scan";
 import { confirm } from "../src/confirm";
 const DURATIONS = [15, 25, 45, 60, 90, 120];
 const REMINDERS: [string, number][] = [
@@ -36,25 +37,35 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 export default function Editor() {
-  const { id, title: titleParam } = useLocalSearchParams<{ id?: string; title?: string }>();
+  const { id, title: titleParam, draft: draftParam } = useLocalSearchParams<{
+    id?: string;
+    title?: string;
+    draft?: string;
+  }>();
   const { state, update } = useStore();
   const task = state.tasks.find((t) => t.id === id);
+  // A scanned screenshot arrives as a prefilled draft (see src/scan.ts).
+  const [scanned] = useState(() => (draftParam ? (JSON.parse(draftParam) as ScanDraft) : null));
   const navigation = useNavigation();
-  const [title, setTitle] = useState(task?.title ?? titleParam ?? "");
-  const [description, setDescription] = useState(task?.description ?? "");
-  const [category, setCategory] = useState<CategoryId>(task?.category ?? "study");
-  const [dueAt, setDueAt] = useState(task?.dueAt ?? null);
+  const [title, setTitle] = useState(task?.title ?? scanned?.title ?? titleParam ?? "");
+  const [description, setDescription] = useState(task?.description ?? scanned?.description ?? "");
+  const [category, setCategory] = useState<CategoryId>(task?.category ?? scanned?.category ?? "study");
+  const [dueAt, setDueAt] = useState(task?.dueAt ?? scanned?.dueAt ?? null);
   const [estimate, setEstimate] = useState(task?.estimate ?? 25);
   const [priority, setPriority] = useState<Priority>(task?.priority ?? "Medium");
   const [reminder, setReminder] = useState<number | null>(task?.reminder ?? null);
-  const [steps, setSteps] = useState<Step[]>(task?.steps ?? []);
+  const [steps, setSteps] = useState<Step[]>(
+    () =>
+      task?.steps ??
+      (scanned?.steps ?? []).map((title) => ({ id: Crypto.randomUUID(), title, done: false })),
+  );
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
   const snapshot = JSON.stringify({ title, description, category, dueAt, estimate, priority, reminder, steps });
   const [original] = useState(snapshot);
-  const dirty = snapshot !== original || !!draft.trim();
+  const dirty = snapshot !== original || !!draft.trim() || (!!scanned && !task);
   usePreventRemove((dirty || busy) && !saved, ({ data }) => {
     if (busy) return;
     void confirm("Discard changes?", "").then((ok) => {
@@ -120,7 +131,10 @@ export default function Editor() {
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
       <View style={[s.row, { paddingHorizontal: 12, paddingVertical: 8 }]}>
         <IconButton name="close" label="Close" onPress={() => router.back()} />
-        <Text style={[s.h3, { flex: 1, textAlign: "center" }]}>{task ? "Edit Task" : "New Task"}</Text>
+        <View style={[s.row, { flex: 1, justifyContent: "center", gap: 6 }]}>
+          {scanned && <Icon name="scan" color={C.primary} size={18} />}
+          <Text style={s.h3}>{task ? "Edit Task" : "New Task"}</Text>
+        </View>
         <Button label="Save" busy={busy} onPress={() => void save()} style={{ minHeight: 40, paddingVertical: 8 }} />
       </View>
       <ScrollView contentContainerStyle={[s.screen, { paddingBottom: 60 }]} keyboardShouldPersistTaps="handled">

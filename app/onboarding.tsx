@@ -32,7 +32,7 @@ export default function Onboarding() {
         </SafeAreaView>
       </View>
       <SafeAreaView edges={["bottom"]} style={{ padding: 24, gap: 18 }}>
-        <Text style={[s.big, { textAlign: "center" }]}>FocusPal</Text>
+        <Text style={[s.big, { textAlign: "center" }]}>Questly</Text>
         <TextInput
           value={name}
           onChangeText={setName}

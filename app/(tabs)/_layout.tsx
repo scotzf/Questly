@@ -5,7 +5,6 @@ import { useStore } from "../../src/store";
 const TABS: [string, string, IconName, IconName][] = [
   ["index", "Home", "home-outline", "home"],
   ["tasks", "Tasks", "checkbox-outline", "checkbox"],
-  ["focus", "Focus", "timer-outline", "timer"],
   ["calendar", "Calendar", "calendar-outline", "calendar"],
   ["more", "More", "ellipsis-horizontal-circle-outline", "ellipsis-horizontal-circle"],
 ];

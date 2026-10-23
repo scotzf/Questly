@@ -3,12 +3,19 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { useStore } from "../../src/store";
 import {
+  balance,
   dayKey,
-  formatMinutes,
+  isFrozen,
+  dayXp,
   nextStep,
   progress,
+  quests,
   sortTasks,
+  startOfDay,
   streak,
+  taskXp,
+  toggleTask,
+  xpByDay,
 } from "../../src/domain";
 import { CATEGORIES, shadow } from "../../src/theme";
 import {
@@ -18,11 +25,12 @@ import {
   Empty,
   Fab,
   Icon,
-  IconButton,
+  IconName,
   IconTile,
   Mascot,
   Pill,
   ProgressBar,
+  Ring,
   Scene,
   Screen,
   date,
@@ -30,88 +38,140 @@ import {
   time,
 } from "../../src/ui";
 import { useNow } from "../../src/useNow";
-const greeting = (hour: number) =>
-  hour < 12 ? "Good morning," : hour < 18 ? "Good afternoon," : "Good evening,";
+const LETTERS = ["M", "T", "W", "T", "F", "S", "S"];
 export default function Home() {
-  const { state } = useStore();
+  const { state, update } = useStore();
   const now = useNow();
-  const today = dayKey(now);
-  const pending = sortTasks(state.tasks.filter((t) => !t.completedAt));
-  const next = state.timer
-    ? state.tasks.find((t) => t.id === state.timer!.taskId)
-    : pending[0];
-  const todays = state.tasks.filter(
-    (t) =>
-      (t.dueAt && dayKey(t.dueAt) === today) ||
-      (t.completedAt && dayKey(t.completedAt) === today),
-  );
-  const doneToday = todays.filter((t) => t.completedAt).length;
-  const minutes =
-    state.sessions
-      .filter((x) => dayKey(x.endedAt) === today)
-      .reduce((a, b) => a + b.seconds, 0) / 60;
+  const goal = state.settings.dailyGoal;
+  const today = dayXp(state, now);
   const days = streak(state, now);
   const { level } = progress(state);
+  const coins = balance(state);
+  const week = xpByDay(state, now);
+  const daily = quests(state, now);
+  const next = sortTasks(state.tasks.filter((t) => !t.completedAt))[0];
   const cat = next && CATEGORIES[next.category];
   const step = next && nextStep(next);
+  const reached = today >= goal;
   return (
     <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: C.bg }}>
       <Screen padBottom={110}>
-        <View style={[s.row, { marginBottom: 16 }]}>
-          <View style={{ flex: 1 }}>
-            <Text style={[s.body, { fontWeight: "600" }]}>
-              {greeting(new Date(now).getHours())}
-            </Text>
-            <Text style={s.h1}>
-              {state.settings.name ? `${state.settings.name}!` : "Hi!"} 👋
-            </Text>
-            <Text style={s.small}>
-              {new Date(now).toLocaleDateString([], {
-                weekday: "short",
-                month: "short",
-                day: "numeric",
-                year: "numeric",
-              })}
-            </Text>
-          </View>
-          <IconButton name="notifications-outline" label="Notifications" onPress={() => router.push("/notifications")} />
-          <IconButton name="stats-chart-outline" label="Statistics" onPress={() => router.push("/stats")} />
+        <View style={[s.row, { marginBottom: 14, gap: 8 }]}>
+          <Pressable onPress={() => router.push("/stats")} style={{ flex: 1 }}>
+            <Text style={s.h1}>{state.settings.name || "Hi"} 👋</Text>
+          </Pressable>
+          <Pill label={String(days)} icon="flame" color="#F97316" />
+          <Pressable onPress={() => router.push("/shop")}>
+            <Pill label={coins.toLocaleString()} icon="ellipse" color={C.gold} />
+          </Pressable>
+          <Pill label={`Lv ${level}`} icon="star" color={C.primary} />
         </View>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Rewards"
-          onPress={() => router.push("/rewards")}
-          style={[{ height: 190, borderRadius: 28, overflow: "hidden", marginBottom: 16 }, shadow]}
+          accessibilityLabel="Statistics"
+          onPress={() => router.push("/stats")}
+          style={[{ height: 200, borderRadius: 28, overflow: "hidden", marginBottom: 16 }, shadow]}
         >
           <Scene />
-          <View style={[s.row, { position: "absolute", top: 14, left: 14, gap: 8 }]}>
-            <Pill label={`${days}`} icon="flame" color="#F97316" background="rgba(255,255,255,0.9)" />
-            <Pill label={`Lv ${level}`} icon="star" color={C.primary} background="rgba(255,255,255,0.9)" />
-          </View>
-          <View style={{ position: "absolute", right: 18, bottom: 6 }}>
-            <Mascot size={130} mood={doneToday ? "happy" : "neutral"} />
+          <View style={[s.row, { flex: 1, paddingHorizontal: 22, justifyContent: "space-between" }]}>
+            <Ring
+              progress={today / goal}
+              size={124}
+              stroke={12}
+              color={reached ? C.success : C.primary}
+              track="rgba(255,255,255,0.75)"
+            >
+              {reached ? (
+                <Icon name="checkmark" color={C.success} size={44} />
+              ) : (
+                <>
+                  <Text style={[s.h1, { fontSize: 30 }]}>{today}</Text>
+                  <Text style={[s.small, { color: C.ink, fontWeight: "700" }]}>/ {goal} XP</Text>
+                </>
+              )}
+            </Ring>
+            <Mascot size={140} mood={reached ? "happy" : today ? "calm" : "neutral"} />
           </View>
         </Pressable>
+        <Card style={[s.row, { justifyContent: "space-between", paddingVertical: 14 }]}>
+          {week.map((d, i) => {
+            const isToday = d.day === startOfDay(now);
+            const frozen = isFrozen(state, d.day);
+            const active = d.xp > 0;
+            return (
+              <View key={d.day} style={{ alignItems: "center", gap: 4 }}>
+                <View
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: active ? "#FFEDD5" : frozen ? "#E0F2FE" : "#F1F4F9",
+                    borderWidth: isToday ? 2 : 0,
+                    borderColor: "#F97316",
+                  }}
+                >
+                  <Icon
+                    name={active ? "flame" : frozen ? "snow" : "flame-outline"}
+                    color={active ? "#F97316" : frozen ? "#0EA5E9" : C.faint}
+                    size={20}
+                  />
+                </View>
+                <Text style={{ fontSize: 12, fontWeight: "700", color: isToday ? "#F97316" : C.faint }}>
+                  {LETTERS[i]}
+                </Text>
+              </View>
+            );
+          })}
+        </Card>
+        <Card>
+          <View style={s.row}>
+            <Text style={[s.h3, { flex: 1 }]}>Daily Quests</Text>
+            <Icon name="gift" color={C.gold} />
+          </View>
+          {daily.map((q) => {
+            const done = q.value >= q.goal;
+            return (
+              <View key={q.id} style={[s.row, { minHeight: 52 }]}>
+                <IconTile name={q.icon as IconName} color={done ? C.success : C.gold} size={38} />
+                <View style={{ flex: 1, gap: 6 }}>
+                  <Text style={[s.body, { color: C.ink, fontWeight: "600" }]}>{q.title}</Text>
+                  <ProgressBar value={q.value / q.goal} color={done ? C.success : C.gold} />
+                </View>
+                {done ? (
+                  <Icon name="checkmark-circle" color={C.success} size={26} />
+                ) : (
+                  <Text style={[s.small, { fontWeight: "800", width: 44, textAlign: "right" }]}>
+                    {q.value}/{q.goal}
+                  </Text>
+                )}
+              </View>
+            );
+          })}
+        </Card>
         {next && cat ? (
-          <Card style={{ padding: 20, gap: 12 }}>
-            <View style={s.row}>
-              <Text style={[s.small, { flex: 1, fontWeight: "700" }]}>
-                {state.timer ? "Focusing" : "Next Task"}
-              </Text>
-              {next.priority === "High" && <Icon name="flag" color={C.danger} size={18} />}
-            </View>
+          <Card style={{ borderLeftWidth: 5, borderLeftColor: cat.color }}>
+            <Text style={[s.small, { fontWeight: "700" }]}>Up Next</Text>
             <Pressable onPress={() => router.push({ pathname: "/task/[id]", params: { id: next.id } })}>
               <Text style={[s.h2, { fontSize: 22 }]}>{next.title}</Text>
             </Pressable>
             <View style={[s.row, { gap: 8, flexWrap: "wrap" }]}>
               <Pill label={cat.label} icon={cat.icon} color={cat.color} />
-              <Pill label={`${next.estimate} min`} icon="time-outline" color={C.muted} background="#F1F4F9" />
               {next.dueAt && (
                 <Pill
-                  label={dayKey(next.dueAt) === today ? time(next.dueAt) : date(next.dueAt)}
+                  label={dayKey(next.dueAt) === dayKey(now) ? time(next.dueAt) : date(next.dueAt)}
                   icon="calendar-outline"
                   color={next.dueAt < now ? C.danger : C.muted}
                   background={next.dueAt < now ? C.dangerPale : "#F1F4F9"}
+                />
+              )}
+              {next.steps.length > 0 && (
+                <Pill
+                  label={`${next.steps.filter((x) => x.done).length}/${next.steps.length}`}
+                  icon="list"
+                  color={C.muted}
+                  background="#F1F4F9"
                 />
               )}
             </View>
@@ -122,55 +182,16 @@ export default function Home() {
               </View>
             )}
             <Button
-              label={state.timer ? "Resume Focus" : "Start Focus"}
-              icon="play"
-              onPress={() =>
-                router.push(
-                  state.timer
-                    ? "/(tabs)/focus"
-                    : { pathname: "/(tabs)/focus", params: { taskId: next.id } },
-                )
-              }
+              label={`Done · +${taskXp({ ...next, completedAt: now })} XP`}
+              icon="checkmark"
+              onPress={() => void update((v) => toggleTask(v, next.id))}
             />
           </Card>
         ) : (
           <Card>
-            <Empty
-              title="All clear"
-              action={<Button label="Add task" icon="add" onPress={() => router.push("/quick-add")} />}
-            />
+            <Empty title="All clear" />
           </Card>
         )}
-        <Card onPress={() => router.push("/(tabs)/tasks")}>
-          <View style={s.row}>
-            <Text style={[s.h3, { flex: 1 }]}>Today&apos;s Progress</Text>
-            <Text style={[s.h3, { color: C.primary }]}>
-              {todays.length ? Math.round((doneToday / todays.length) * 100) : 0}%
-            </Text>
-          </View>
-          <Text style={[s.big, { fontSize: 34 }]}>
-            {doneToday}
-            <Text style={[s.h2, { color: C.faint }]}> / {todays.length} tasks</Text>
-          </Text>
-          <ProgressBar value={todays.length ? doneToday / todays.length : 0} color={C.success} height={10} />
-        </Card>
-        <View style={s.row}>
-          <Card style={{ flex: 1 }} onPress={() => router.push("/stats")}>
-            <IconTile name="hourglass" color="#8B5CF6" />
-            <Text style={s.h2}>{formatMinutes(minutes)}</Text>
-            <Text style={s.small}>Focused</Text>
-          </Card>
-          <Card style={{ flex: 1 }} onPress={() => router.push("/rewards")}>
-            <IconTile name="flame" color="#F97316" />
-            <Text style={s.h2}>{days} days</Text>
-            <Text style={s.small}>Streak</Text>
-          </Card>
-        </View>
-        <Card onPress={() => router.push("/plan")} style={{ flexDirection: "row", alignItems: "center" }}>
-          <IconTile name="sparkles" color={C.primary} />
-          <Text style={[s.h3, { flex: 1 }]}>Plan my day</Text>
-          <Icon name="chevron-forward" color={C.faint} size={18} />
-        </Card>
       </Screen>
       <Fab onPress={() => router.push("/quick-add")} />
     </SafeAreaView>
